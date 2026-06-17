@@ -1,0 +1,13 @@
+module MVI {
+    struct PsuData {
+        unsigned long timeStamp;
+        double setpoint;
+        double iMeasured;
+        double uMeasured;
+        unsigned short flags;
+    };
+
+    struct PsuDataSeq {
+        sequence<PsuData> data;
+    };
+};
