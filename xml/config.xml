@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <labels>
-    <address>109.123.186.28</address>
+    <publisher>1.2.3.4</publisher>
+    <subscriber>1.2.3.4</subscriber>
     <port>5100</port>
 </labels>

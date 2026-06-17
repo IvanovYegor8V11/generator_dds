@@ -45,7 +45,7 @@ public:
         // [OPTIONAL] Set unicast locators
         eprosima::fastdds::rtps::Locator_t locator;
         locator.kind = LOCATOR_KIND_TCPv4;
-        eprosima::fastdds::rtps::IPLocator::setIPv4(locator, c.address);
+        eprosima::fastdds::rtps::IPLocator::setIPv4(locator, c.publisher);
         eprosima::fastdds::rtps::IPLocator::setPhysicalPort(locator, c.port);
         // [OPTIONAL] Logical port default value is 0, automatically assigned.
         eprosima::fastdds::rtps::IPLocator::setLogicalPort(locator, c.port);
@@ -93,44 +93,45 @@ public:
     bool loadConfig(const std::string& filename) {
         tinyxml2::XMLDocument doc;
 
-        if (doc.LoadFile(filename.c_str()) != tinyxml2::XML_SUCCESS)
-        {
+        if (doc.LoadFile(filename.c_str()) != tinyxml2::XML_SUCCESS) {
             std::cerr << "Failed to load file: " << filename << '\n';
             return false;
         }
 
         auto* root = doc.FirstChildElement("labels");
-        if (!root)
-        {
+        if (!root) {
             std::cerr << "No <labels> element found\n";
             return false;
         }
 
-        auto* addressElem = root->FirstChildElement("address");
+        auto* publisherElem = root->FirstChildElement("publisher");
+        auto* subscriberElem = root->FirstChildElement("subscriber");
         auto* portElem = root->FirstChildElement("port");
 
-        if (!addressElem || !portElem)
-        {
-            std::cerr << "Missing address or port element\n";
+        if (!publisherElem || !subscriberElem || !portElem) {
+            std::cerr << "Missing address, subscriber or port element\n";
             return false;
         }
 
-        const char* addressText = addressElem->GetText();
-        if (!addressText)
-        {
+        const char* addressText = publisherElem->GetText();
+        if (!addressText) {
             std::cerr << "Empty address\n";
             return false;
         }
+        this->c.publisher = addressText;
 
-        this->c.address = addressText;
+        const char* subscriberText = subscriberElem->GetText();
+        if (!subscriberText) {
+            std::cerr << "Empty subscriber address\n";
+            return false;
+        }
+        this->c.subscriber = subscriberText;
 
         int port = 0;
-        if (portElem->QueryIntText(&port) != tinyxml2::XML_SUCCESS)
-        {
+        if (portElem->QueryIntText(&port) != tinyxml2::XML_SUCCESS) {
             std::cerr << "Invalid port\n";
             return false;
         }
-
         this->c.port = static_cast<uint16_t>(port);
 
         return true;

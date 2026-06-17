@@ -5,7 +5,8 @@
 #include <string>
 
 struct config {
-    std::string address;
+    std::string publisher;
+    std::string subscriber;
     uint16_t port;
 };
 

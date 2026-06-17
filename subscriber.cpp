@@ -1,4 +1,6 @@
 #include <iostream>
+#include <thread>
+#include <chrono>
 
 #include <tinyxml2.h>
 
@@ -23,7 +25,7 @@ public:
 
     bool init(uint16_t mvi, uint8_t psu) {
         loadConfig("xml/config.xml");
-        
+
         eprosima::fastdds::dds::DomainParticipantQos qos;
 
         // Disable the built-in Transport Layer.
@@ -32,6 +34,9 @@ public:
         // Create a descriptor for the new transport.
         // Do not configure any listener port
         auto tcp_transport = std::make_shared<eprosima::fastdds::rtps::TCPv4TransportDescriptor>();
+
+        tcp_transport->add_listener_port(c.port);
+
         qos.transport().user_transports.push_back(tcp_transport);
 
         // [OPTIONAL] ThreadSettings configuration
@@ -43,13 +48,22 @@ public:
         // Set initial peers.
         eprosima::fastdds::rtps::Locator_t initial_peer_locator;
         initial_peer_locator.kind = LOCATOR_KIND_TCPv4;
-        eprosima::fastdds::rtps::IPLocator::setIPv4(initial_peer_locator, c.address);
+        eprosima::fastdds::rtps::IPLocator::setIPv4(initial_peer_locator, c.publisher);
         eprosima::fastdds::rtps::IPLocator::setPhysicalPort(initial_peer_locator, c.port);
         // If the logical port is set in the server side, it must be also set here with the same value.
         // If not set in the server side in a unicast locator, do not set it here.
         eprosima::fastdds::rtps::IPLocator::setLogicalPort(initial_peer_locator, c.port);
 
         qos.wire_protocol().builtin.initialPeersList.push_back(initial_peer_locator);
+
+        eprosima::fastdds::rtps::Locator_t sub_metatraffic_locator;
+        sub_metatraffic_locator.kind = LOCATOR_KIND_TCPv4;
+
+        eprosima::fastdds::rtps::IPLocator::setIPv4(sub_metatraffic_locator, c.subscriber);
+        eprosima::fastdds::rtps::IPLocator::setPhysicalPort(sub_metatraffic_locator, c.port);
+        eprosima::fastdds::rtps::IPLocator::setLogicalPort(sub_metatraffic_locator, c.port);
+
+        qos.wire_protocol().builtin.metatrafficUnicastLocatorList.push_back(sub_metatraffic_locator);
 
         participant_ = DomainParticipantFactory::get_instance()->create_participant(0, qos);
 
@@ -87,44 +101,45 @@ public:
     bool loadConfig(const std::string& filename) {
         tinyxml2::XMLDocument doc;
 
-        if (doc.LoadFile(filename.c_str()) != tinyxml2::XML_SUCCESS)
-        {
+        if (doc.LoadFile(filename.c_str()) != tinyxml2::XML_SUCCESS) {
             std::cerr << "Failed to load file: " << filename << '\n';
             return false;
         }
 
         auto* root = doc.FirstChildElement("labels");
-        if (!root)
-        {
+        if (!root) {
             std::cerr << "No <labels> element found\n";
             return false;
         }
 
-        auto* addressElem = root->FirstChildElement("address");
+        auto* publisherElem = root->FirstChildElement("publisher");
+        auto* subscriberElem = root->FirstChildElement("subscriber");
         auto* portElem = root->FirstChildElement("port");
 
-        if (!addressElem || !portElem)
-        {
-            std::cerr << "Missing address or port element\n";
+        if (!publisherElem || !subscriberElem || !portElem) {
+            std::cerr << "Missing address, subscriber or port element\n";
             return false;
         }
 
-        const char* addressText = addressElem->GetText();
-        if (!addressText)
-        {
+        const char* addressText = publisherElem->GetText();
+        if (!addressText) {
             std::cerr << "Empty address\n";
             return false;
         }
+        this->c.publisher = addressText;
 
-        this->c.address = addressText;
+        const char* subscriberText = subscriberElem->GetText();
+        if (!subscriberText) {
+            std::cerr << "Empty subscriber address\n";
+            return false;
+        }
+        this->c.subscriber = subscriberText;
 
         int port = 0;
-        if (portElem->QueryIntText(&port) != tinyxml2::XML_SUCCESS)
-        {
+        if (portElem->QueryIntText(&port) != tinyxml2::XML_SUCCESS) {
             std::cerr << "Invalid port\n";
             return false;
         }
-
         this->c.port = static_cast<uint16_t>(port);
 
         return true;
