@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <labels>
-    <publisher>1.2.3.4</publisher>
-    <subscriber>1.2.3.4</subscriber>
+    <publisher>109.123.186.28</publisher>
+    <subscriber>109.123.186.28</subscriber>
     <port>5100</port>
+    <connectionType>UDP</connectionType>
 </labels>
