@@ -1,8 +1,5 @@
-#include <iostream>
 #include <thread>
 #include <chrono>
-
-#include <tinyxml2.h>
 
 #include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
@@ -16,7 +13,7 @@
 #include "PsuDataPubSubTypes.hpp"
 #include "makeTopicName.h"
 #include "ReaderListener.h"
-#include "config.h"
+#include "loadConfig.h"
 
 using namespace eprosima::fastdds::dds;
 
@@ -24,7 +21,7 @@ class PsuSubscriber {
 public:
 
     bool init(uint16_t mvi, uint8_t psu) {
-        loadConfig("xml/config.xml");
+        loadConfig("xml/config.xml", this->c);
 
         eprosima::fastdds::dds::DomainParticipantQos qos;
 
@@ -89,61 +86,10 @@ public:
             return false;
         }
 
-        reader_ =
-            subscriber_->create_datareader(
-                topic_,
-                DATAREADER_QOS_DEFAULT,
-                &listener_);
+        reader_ = subscriber_->create_datareader(topic_, DATAREADER_QOS_DEFAULT, &listener_);
 
         return reader_ != nullptr;
-    }
-
-    bool loadConfig(const std::string& filename) {
-        tinyxml2::XMLDocument doc;
-
-        if (doc.LoadFile(filename.c_str()) != tinyxml2::XML_SUCCESS) {
-            std::cerr << "Failed to load file: " << filename << '\n';
-            return false;
-        }
-
-        auto* root = doc.FirstChildElement("labels");
-        if (!root) {
-            std::cerr << "No <labels> element found\n";
-            return false;
-        }
-
-        auto* publisherElem = root->FirstChildElement("publisher");
-        auto* subscriberElem = root->FirstChildElement("subscriber");
-        auto* portElem = root->FirstChildElement("port");
-
-        if (!publisherElem || !subscriberElem || !portElem) {
-            std::cerr << "Missing address, subscriber or port element\n";
-            return false;
-        }
-
-        const char* addressText = publisherElem->GetText();
-        if (!addressText) {
-            std::cerr << "Empty address\n";
-            return false;
-        }
-        this->c.publisher = addressText;
-
-        const char* subscriberText = subscriberElem->GetText();
-        if (!subscriberText) {
-            std::cerr << "Empty subscriber address\n";
-            return false;
-        }
-        this->c.subscriber = subscriberText;
-
-        int port = 0;
-        if (portElem->QueryIntText(&port) != tinyxml2::XML_SUCCESS) {
-            std::cerr << "Invalid port\n";
-            return false;
-        }
-        this->c.port = static_cast<uint16_t>(port);
-
-        return true;
-    }
+    }    
 
     ~PsuSubscriber() {
         if (participant_) {
