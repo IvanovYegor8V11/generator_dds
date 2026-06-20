@@ -9,6 +9,7 @@
 #include <fastdds/dds/domain/qos/DomainParticipantQos.hpp>
 
 #include <fastdds/rtps/transport/TCPv4TransportDescriptor.hpp>
+#include <fastdds/rtps/transport/UDPv4TransportDescriptor.hpp>
 
 #include "PsuDataPubSubTypes.hpp"
 #include "makeTopicName.h"
@@ -21,34 +22,51 @@ public:
     bool init(uint16_t mvi, uint8_t psu) {
         loadConfig("xml/config.xml", this->c);
 
-        eprosima::fastdds::dds::DomainParticipantQos qos;
+        DomainParticipantQos qos;
 
-        // Create a descriptor for the new transport.
-        auto tcp_transport = std::make_shared<eprosima::fastdds::rtps::TCPv4TransportDescriptor>();
-        tcp_transport->add_listener_port(c.port);
+        std::string transport = c.connectionType;
+        std::transform(transport.begin(), transport.end(), transport.begin(), ::toupper);
 
-        // [OPTIONAL] ThreadSettings configuration
-        tcp_transport->default_reception_threads(eprosima::fastdds::rtps::ThreadSettings{-1, 0, 0, -1});
-        tcp_transport->set_thread_config_for_port(12345, eprosima::fastdds::rtps::ThreadSettings{-1, 0, 0, -1});
-        tcp_transport->keep_alive_thread = eprosima::fastdds::rtps::ThreadSettings{-1, 0, 0, -1};
-        tcp_transport->accept_thread = eprosima::fastdds::rtps::ThreadSettings{-1, 0, 0, -1};
+        if (transport == "TCP") {
+            auto tcp_transport = std::make_shared<eprosima::fastdds::rtps::TCPv4TransportDescriptor>();
+            tcp_transport->add_listener_port(c.port);
+            tcp_transport->default_reception_threads(eprosima::fastdds::rtps::ThreadSettings{-1, 0, 0, -1});
+            tcp_transport->set_thread_config_for_port(12345, eprosima::fastdds::rtps::ThreadSettings{-1, 0, 0, -1});
+            tcp_transport->keep_alive_thread = eprosima::fastdds::rtps::ThreadSettings{-1, 0, 0, -1};
+            tcp_transport->accept_thread = eprosima::fastdds::rtps::ThreadSettings{-1, 0, 0, -1};
 
-        // Link the Transport Layer to the Participant.
-        qos.transport().user_transports.push_back(tcp_transport);
+            qos.transport().user_transports.push_back(tcp_transport);
+            qos.transport().use_builtin_transports = false;
 
-        // Avoid using the default transport
-        qos.transport().use_builtin_transports = false;
+            eprosima::fastdds::rtps::Locator_t locator;
+            locator.kind = LOCATOR_KIND_TCPv4;
 
-        // [OPTIONAL] Set unicast locators
-        eprosima::fastdds::rtps::Locator_t locator;
-        locator.kind = LOCATOR_KIND_TCPv4;
-        eprosima::fastdds::rtps::IPLocator::setIPv4(locator, c.publisher);
-        eprosima::fastdds::rtps::IPLocator::setPhysicalPort(locator, c.port);
-        // [OPTIONAL] Logical port default value is 0, automatically assigned.
-        eprosima::fastdds::rtps::IPLocator::setLogicalPort(locator, c.port);
+            eprosima::fastdds::rtps::IPLocator::setIPv4(locator, c.publisher);
+            eprosima::fastdds::rtps::IPLocator::setPhysicalPort(locator, c.port);
+            eprosima::fastdds::rtps::IPLocator::setLogicalPort(locator, c.port);
 
-        qos.wire_protocol().builtin.metatrafficUnicastLocatorList.push_back(locator);
-        qos.wire_protocol().default_unicast_locator_list.push_back(locator);
+            qos.wire_protocol().builtin.metatrafficUnicastLocatorList.push_back(locator);
+            qos.wire_protocol().default_unicast_locator_list.push_back(locator);
+        }
+        else if (transport == "UDP") {
+            auto udp_transport = std::make_shared<eprosima::fastdds::rtps::UDPv4TransportDescriptor>();
+
+            qos.transport().user_transports.push_back(udp_transport);
+            qos.transport().use_builtin_transports = false;
+
+            eprosima::fastdds::rtps::Locator_t locator;
+            locator.kind = LOCATOR_KIND_UDPv4;
+
+            eprosima::fastdds::rtps::IPLocator::setIPv4(locator, c.publisher);
+            eprosima::fastdds::rtps::IPLocator::setPhysicalPort(locator, c.port);
+
+            qos.wire_protocol().builtin.metatrafficUnicastLocatorList.push_back(locator);
+            qos.wire_protocol().default_unicast_locator_list.push_back(locator);
+        }
+        else {
+            std::cerr << "Unknown connectionType: " << c.connectionType << std::endl;
+            return false;
+        }
 
         participant_ = DomainParticipantFactory::get_instance()->create_participant(0, qos);
 
